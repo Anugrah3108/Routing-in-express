@@ -1,74 +1,169 @@
-let blogs = [];
+// let blogs = [];
 
-const createBlog = (req, res) => {
+const { MongoClient, ObjectId } = require("mongodb");
+const { MONGO_URI } = require("../env");
+const { BLOG_DB, BLOGS_COL } = require("../constants");
+
+const createBlog = async (req, res) => {
   //   console.log(req.body);
   const { body } = req;
 
   const { author, content } = body;
-
-  if (author && content) {
-    blogs.push({ author, content });
-    res.status(200).send("OK");
-    return;
+  if (!(author && content)) {
+    return res.status(400).send();
   }
-  res.status(400).send("!OK");
+
+  const client = new MongoClient(MONGO_URI);
+
+  try {
+    const blogdb = client.db(BLOG_DB);
+    const blogs = blogdb.collection(BLOGS_COL);
+
+    const result = await blogs.insertOne({ author, content });
+    console.log(
+      `inserted ${{ author, content }} into blogs. with _id ${
+        result.insertedId
+      }`
+    );
+
+    res.status(201).json({ _id: result.insertedId }).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).send();
+  } finally {
+    await client.close();
+  }
 };
 
-const readAllBlogs = (req, res) => {
-  res.status(200).json(blogs).send();
+const readAllBlogs = async (req, res) => {
+  let client = new MongoClient(MONGO_URI);
+
+  try {
+    client = await client.connect();
+    const blogdb = client.db(BLOG_DB);
+    const blogs = blogdb.collection(BLOGS_COL);
+
+    const cursor = blogs.find();
+    const result = await cursor.toArray();
+
+    res.status(200).json(result).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).send();
+  } finally {
+    await client.close();
+  }
 };
-const readBlog = (req, res) => {
+
+const readBlog = async (req, res) => {
   let { blogId } = req.params;
   console.log(blogId);
 
-  if (blogId > 0 && blogId <= blogs.length) {
-    blogId -= 1;
-    const blogToReturn = blogs[blogId];
-    return res.status(200).json(blogToReturn).send();
+  const client = new MongoClient(MONGO_URI);
+
+  try {
+    blogId = new ObjectId(blogId);
+    const blogdb = client.db(BLOG_DB);
+    const blogs = blogdb.collection(BLOGS_COL);
+
+    const result = await blogs.findOne({ _id: blogId });
+
+    res.status(200).json(result).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).send();
+  } finally {
+    await client.close();
   }
-  res.status(404).send();
 };
-const updateBlog = (req, res) => {
+
+const updateBlog = async (req, res) => {
   const { author, content } = req.body;
   let { blogId } = req.params;
 
-  if (blogId > 0 && blogId <= blogs.length && author && content) {
-    blogId -= 1;
-    blogs[blogId] = { author, content };
+  const client = new MongoClient(MONGO_URI);
 
-    return res.status(200).send();
+  try {
+    blogId = new ObjectId(blogId);
+    const blogdb = client.db(BLOG_DB);
+    const blogs = blogdb.collection(BLOGS_COL);
+
+    const result = await blogs.findOneAndUpdate(
+      { _id: blogId },
+      { $set: { author, content } },
+      { returnDocument: "after" }
+    );
+
+    res.status(200).json(result).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).send();
+  } finally {
+    await client.close();
   }
-
-  return res.status(400).send();
 };
-const patchBlog = (req, res) => {
+
+const patchBlog = async (req, res) => {
   const { author, content } = req.body;
   let { blogId } = req.params;
 
-  if (blogId > 0 && blogId <= blogs.length) {
-    blogId -= 1;
-    // blogs[blogId] = { ...blogs[blogId], author, content };
-
-    if (author) blogs[blogId].author = author;
-    if (content) blogs[blogId].content = content;
-
-    return res.status(200).send();
+  if (!(author || content)) {
+    return res.status(400).send();
   }
 
-  return res.status(400).send();
+  const updateDoc = {};
+  if (author) updateDoc.author = author;
+  if (content) updateDoc.content = content;
+
+  const client = new MongoClient(MONGO_URI);
+
+  try {
+    blogId = new ObjectId(blogId);
+    const blogdb = client.db(BLOG_DB);
+    const blogs = blogdb.collection(BLOGS_COL);
+
+    const result = await blogs.findOneAndUpdate(
+      { _id: blogId },
+      { $set: updateDoc },
+      { returnDocument: "after" }
+    );
+
+    res.status(200).json(result).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).send();
+  } finally {
+    await client.close();
+  }
 };
-const deleteBlog = (req, res) => {
+const deleteBlog = async (req, res) => {
   let { blogId } = req.params;
 
-  if (blogId > 0 && blogId <= blogs.length) {
-    blogId -= 1;
+  let client = new MongoClient(MONGO_URI);
 
-    blogs.splice(blogId, 1);
+  try {
+    console.log(blogId);
+    client = await client.connect();
+    blogId = new ObjectId(blogId);
+    const blogdb = client.db(BLOG_DB);
+    const blogs = blogdb.collection(BLOGS_COL);
 
-    return res.status(200).send();
+    // const result = await blogs.findOne({ _id: blogId });
+
+    const result = blogs.findOneAndDelete({ _id: blogId });
+
+    // if (result.value) {
+    //   console.log("Document deleted:", result.value);
+    // } else {
+    //   console.log("No document matches the provided query.");
+    // }
+    res.status(200).json(result).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).send();
+  } finally {
+    await client.close();
   }
-
-  return res.status(404).send();
 };
 
 module.exports = {

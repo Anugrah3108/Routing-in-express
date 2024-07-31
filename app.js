@@ -41,7 +41,7 @@ app.use("/health", healthRouter);
 //   console.log(blogId);
 
 //   if (blogId > 0 && blogId <= blogs.length) {
-//     blogId -= 1;
+// blogId -= 1;
 //     const blogToReturn = blogs[blogId];
 //     return res.status(200).json(blogToReturn).send();
 //   }
