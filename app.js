@@ -1,14 +1,26 @@
 const express = require("express");
 const { blogRouter } = require("./routes/blog");
 const { healthRouter } = require("./routes/health");
+const { default: mongoose } = require("mongoose");
+const { MONGO_URI } = require("./env");
+const methodOverride = require("method-override");
 
 const PORT = 8080;
 const app = express();
 
+app.set("view engine", "ejs");
+app.use(methodOverride("_method"));
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(express.static("public"));
 
 app.use("/blog", blogRouter);
 app.use("/health", healthRouter);
+
+app.listen(PORT, () => {
+  console.log(`Server running on port: ${PORT}`);
+  mongoose.connect(MONGO_URI);
+});
 
 // Basic Way to use CRUD !TODO: mount routes
 // app.get("/health", (req, res) => {
@@ -95,7 +107,3 @@ app.use("/health", healthRouter);
 
 //   return res.status(404).send();
 // });
-
-app.listen(PORT, () => {
-  console.log(`Server running on port: ${PORT}`);
-});
